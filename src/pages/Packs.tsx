@@ -654,14 +654,16 @@ export function InstallGuide() {
             )}
             <ol>
               <li>
-                点底部中间的「<b>分享</b>」按钮{" "}
+                点 Safari 的「<b>分享</b>」按钮{" "}
                 <Share size={16} className="inline-ico" />
+                （旧版 iOS 在底部中间；新版 iOS 在地址栏右边的「<b>···</b>」里）
               </li>
               <li>
-                向上滑动，选「<b>添加到主屏幕</b>」
+                在分享菜单里向上滑动，选「<b>添加到主屏幕</b>」
               </li>
               <li>
-                点右上角「<b>添加</b>」，桌面就有「非莫」了
+                确认「<b>作为网页 App 打开</b>」是<b>开启（绿色）</b>
+                的，再点右上角「<b>添加</b>」，桌面就有「非莫」了
               </li>
             </ol>
             <p className="muted">
