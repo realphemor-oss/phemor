@@ -376,31 +376,25 @@ export function Packs({ route }: { route: Extract<Route, { page: "packs" }> }) {
               </span>
             </li>
           </ul>
-          {info && info.quota > 0 && (
+          {info && info.quota > 0 && !info.persisted && (
             <p className="muted">
-              手机可用空间约 {mb(Math.max(0, info.quota - info.usage))}。
-              {!info.persisted && (
-                <>
-                  {" "}
-                  <button
-                    className="link"
-                    onClick={() =>
-                      requestPersist().then(
-                        (ok) => (
-                          toast(
-                            ok
-                              ? "已申请永久保存"
-                              : "浏览器暂未同意，添加到主屏幕后更稳",
-                          ),
-                          storageInfo().then(setInfo)
-                        ),
-                      )
-                    }
-                  >
-                    防止被系统清理
-                  </button>
-                </>
-              )}
+              <button
+                className="link"
+                onClick={() =>
+                  requestPersist().then(
+                    (ok) => (
+                      toast(
+                        ok
+                          ? "已申请永久保存"
+                          : "浏览器暂未同意，添加到主屏幕后更稳",
+                      ),
+                      storageInfo().then(setInfo)
+                    ),
+                  )
+                }
+              >
+                防止被系统清理
+              </button>
             </p>
           )}
         </section>
