@@ -1,0 +1,10 @@
+{
+  "kv": 1,
+  "packs": [
+    { "id": "list-junior", "name": "初中包", "alias": ["初中", "junior"], "free": true, "file": "1-初中包.phemor" },
+    { "id": "list-senior", "name": "高中包", "alias": ["高中", "senior"], "free": false, "file": "2-高中包.phemor" },
+    { "id": "list-college", "name": "大学包", "alias": ["大学", "college"], "free": false, "file": "3-大学包.phemor" },
+    { "id": "list-advanced", "name": "雅思进阶包", "alias": ["雅思进阶", "雅思", "advanced"], "free": false, "file": "4-雅思进阶包.phemor" },
+    { "id": "list-travel", "name": "旅游包", "alias": ["旅游", "travel"], "free": false, "file": "5-旅游包.phemor" }
+  ]
+}

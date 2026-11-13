@@ -1,0 +1,62 @@
+# 把 phemor.com 发布到 GitHub Pages：
+#   /          ← homepage/（首页）
+#   /words/    ← 非莫雅思词汇（只含网页和词条文字，约 15 MB；插画和发音走单词包）
+# 在仓库 Settings → Pages 里选 “GitHub Actions”，并填入自定义域名 phemor.com。
+# 夸克下载链接可在 Settings → Secrets and variables → Actions → Variables 里设置
+#   PACK_SHARE_URL / PACK_SHARE_CODE，不用改代码。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Build the word atlas (no media)
+        run: npm run build
+        env:
+          ATLAS_BASE: /words/
+          ATLAS_MEDIA: "0"
+          VITE_PACK_SHARE_URL: ${{ vars.PACK_SHARE_URL }}
+          VITE_PACK_SHARE_CODE: ${{ vars.PACK_SHARE_CODE }}
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/words
+          cp -R homepage/. _site/
+          cp -R dist/. _site/words/
+          find _site -name .DS_Store -delete
+          touch _site/.nojekyll
+          echo "phemor.com" > _site/CNAME
+          du -sh _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f4ef" />
+    <meta name="description" content="学一门外语，多一条出路；读金融学经济，更多上升机会。把工作交给 AI，把时间还给自己。" />
+    <title>非我莫属 · phemor</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f5f4ef;
+        --ink: #202723;
+        --muted: #727a75;
+        --line: #dedfd8;
+        --green: #416a58;
+        --blue: #477da7;
+        --blue-wash: #edf3f6;
+        --gold: #a77a2d;
+        --gold-wash: #f6f0e4;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        width: min(100% - 48px, 920px);
+        min-height: 100svh;
+        margin: 0 auto;
+        padding: clamp(50px, 10vh, 100px) 0 42px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .brand {
+        margin: 0 0 clamp(38px, 7vh, 68px);
+        color: var(--green);
+        font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: .26em;
+        text-align: center;
+      }
+      .thesis {
+        margin: 0 auto clamp(32px, 5vh, 50px);
+        max-width: 800px;
+        font-family: "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+        font-size: clamp(25px, 4.2vw, 38px);
+        font-weight: 500;
+        line-height: 1.7;
+        letter-spacing: .045em;
+        text-align: center;
+        text-wrap: balance;
+      }
+      .thesis span { display: block; color: var(--green); }
+      nav {
+        display: grid;
+        grid-template-columns: minmax(0, 420px);
+        justify-content: center;
+        gap: 18px;
+      }
+      nav a {
+        min-height: 150px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        color: inherit;
+        text-align: center;
+        text-decoration: none;
+        transition: transform .2s ease, border-color .2s ease, background-color .2s ease;
+      }
+      nav .english { color: var(--blue); border-color: #d4e0e7; background: var(--blue-wash); }
+      nav a:hover { transform: translateY(-3px); }
+      nav .english:hover { border-color: var(--blue); background: #e8f0f4; }
+      nav strong { font-size: clamp(21px, 3vw, 25px); font-weight: 600; letter-spacing: .1em; }
+      .ai-section {
+        margin-top: clamp(42px, 7vh, 68px);
+        padding-top: clamp(30px, 5vh, 48px);
+        border-top: 1px solid var(--line);
+        text-align: center;
+      }
+      .ai-section h2 {
+        margin: 0;
+        font-size: clamp(24px, 4vw, 34px);
+        font-weight: 600;
+        letter-spacing: .04em;
+      }
+      .ai-section h2 span { display: inline; }
+      .ai-section p {
+        max-width: 760px;
+        margin: 16px auto 0;
+        color: var(--muted);
+        font-size: clamp(15px, 2vw, 18px);
+        line-height: 1.9;
+      }
+      .email {
+        display: inline-block;
+        margin-top: 18px;
+        color: var(--green);
+        font-size: 15px;
+        text-decoration-color: #b7c7bd;
+        text-underline-offset: 5px;
+      }
+      .email:hover { text-decoration-color: currentColor; }
+      @media (max-width: 600px) {
+        main { width: min(100% - 36px, 460px); padding: 30px 0 28px; }
+        .brand { margin-bottom: 28px; font-size: 16px; letter-spacing: .2em; }
+        .thesis { margin-bottom: 24px; font-size: clamp(20px, 5.4vw, 23px); line-height: 1.55; letter-spacing: .015em; }
+        nav { grid-template-columns: 1fr; gap: 10px; }
+        nav a { min-height: 78px; padding: 18px; }
+        nav strong { font-size: 20px; }
+        .ai-section { margin-top: 28px; padding-top: 24px; }
+        .ai-section h2 { font-size: clamp(20px, 5.1vw, 23px); line-height: 1.55; letter-spacing: .015em; }
+        .ai-section h2 span { display: block; }
+        .ai-section p { margin-top: 12px; font-size: 14px; line-height: 1.75; }
+        .email { margin-top: 14px; font-size: 14px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="brand">非我莫属</p>
+      <p class="thesis">学一门外语，多一条出路<span>读金融学经济，更多上升机会</span></p>
+      <nav aria-label="内容入口">
+        <a class="english" href="https://phemor.com/words/"><strong>英语学习</strong></a>
+      </nav>
+      <section class="ai-section" aria-labelledby="ai-title">
+        <h2 id="ai-title">把工作交给 AI，<span>把生活还给自己</span></h2>
+        <p>AI 智能人作为员工，负责你自媒体账号 90% 的内容生产，只按约定分享 40% 收益。</p>
+        <a class="email" href="mailto:realphemor@gmail.com">realphemor@gmail.com</a>
+      </section>
+    </main>
+  </body>
+</html>

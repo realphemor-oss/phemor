@@ -1,0 +1,317 @@
+/* 单词包 / 离线学习 / 添加到主屏幕 */
+.packs-lede {
+  max-width: 46ch;
+  margin-top: 12px;
+}
+.packs-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (min-width: 900px) {
+  .packs-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+}
+.packs .panel + .panel,
+.packs .packs-busy,
+.packs .packs-warn,
+.packs .packs-incoming,
+.packs .packs-ok {
+  margin-bottom: 16px;
+}
+.packs-busy progress {
+  width: 100%;
+  height: 10px;
+  margin: 12px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--paper-3);
+  accent-color: var(--ochre);
+}
+.packs-busy progress::-webkit-progress-bar {
+  background: var(--paper-3);
+}
+.packs-busy progress::-webkit-progress-value {
+  background: var(--ochre);
+  border-radius: 999px;
+}
+.packs-busy .btn {
+  margin-top: 12px;
+}
+.packs-warn {
+  background: var(--terra-soft);
+  border-color: transparent;
+  color: var(--terra-ink);
+}
+.packs-ok p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: var(--sage-ink);
+}
+.packs-status {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.packs-status li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.packs-status li svg {
+  flex: none;
+}
+.packs-status li.ok {
+  color: var(--ink);
+}
+.packs-status li.ok svg {
+  color: var(--sage-ink);
+}
+.packs-status .link {
+  margin-left: auto;
+  flex: none;
+}
+.packs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.packs-tip {
+  margin: 12px 0 18px;
+}
+.packs-tip code {
+  font: 600 13px var(--mono);
+  background: var(--paper-2);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.packs-link {
+  display: block;
+}
+.packs-link > div {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.packs-link input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card-2);
+  color: var(--ink);
+  font: 500 15px var(--sans);
+}
+.packs-link input:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 1px;
+}
+.pack-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pack-group {
+  margin: 18px 0 6px;
+  font: 700 12px var(--sans);
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.pack-rows li:first-child .pack-group {
+  margin-top: 0;
+}
+.pack-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--line-strong);
+}
+.pack-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.pack-row b {
+  font-size: 15px;
+}
+.pack-row small {
+  color: var(--ink-3);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.pack-row .btn {
+  flex: none;
+  height: 40px;
+}
+.is-done .pack-row b {
+  color: var(--ink-2);
+}
+.chip-ok {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sage-ink);
+}
+.install-tabs {
+  margin-bottom: 16px;
+  max-width: 420px;
+}
+.install-steps ol {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: grid;
+  gap: 14px;
+}
+.install-steps li {
+  counter-increment: step;
+  position: relative;
+  padding-left: 40px;
+  min-height: 28px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.install-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ochre-soft);
+  color: var(--ink);
+  font: 700 14px var(--sans);
+}
+.install-note {
+  margin: 0 0 14px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.install-steps .btn {
+  margin-bottom: 16px;
+}
+.inline-ico {
+  display: inline;
+  vertical-align: -3px;
+}
+.packs-foot {
+  margin-top: 20px;
+}
+
+/* Today / Me entry cards */
+.offline-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+.offline-card svg {
+  flex: none;
+  color: var(--ochre);
+}
+.offline-card span {
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.offline-card small {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.offline-card .link {
+  margin-left: auto;
+  flex: none;
+}
+
+.packs-share p {
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.packs-share .packs-tip {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+
+.license-panel {
+  margin-bottom: 16px;
+}
+.license-device {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.license-device code {
+  font: 600 16px var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.06em;
+  background: var(--paper-2);
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+.license-paste {
+  display: flex;
+  gap: 8px;
+}
+.license-paste input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card-2);
+  color: var(--ink);
+  font: 500 15px var(--sans);
+}
+.license-paste input:focus-visible {
+  outline: 2px solid var(--ochre);
+  outline-offset: 1px;
+}
+.license-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.license-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}

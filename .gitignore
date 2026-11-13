@@ -1,0 +1,19 @@
+/node_modules/
+/dist/
+.local/
+.env
+.env.*
+!.env.example
+output/
+*.zip
+.DS_Store
+.playwright-cli/
+*.tsbuildinfo
+.pack-work/
+/packs/
+*.phemor
+
+# 图片和发音走夸克网盘的单词包，不放进 GitHub（约 700 MB）
+/public/atlas/img/
+/public/atlas/thumb/
+/public/atlas/audio/
