@@ -103,21 +103,14 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  align-items: center;
 }
-.packs-link input {
+.packs-link .packs-link-url {
   flex: 1;
   min-width: 0;
-  height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--card-2);
-  color: var(--ink);
-  font: 500 15px var(--sans);
-}
-.packs-link input:focus-visible {
-  outline: 2px solid var(--ochre);
-  outline-offset: 1px;
+  align-self: center;
+  overflow-wrap: anywhere;
+  user-select: all;
 }
 .pack-rows {
   list-style: none;

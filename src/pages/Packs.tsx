@@ -94,7 +94,6 @@ export function Packs({ route }: { route: Extract<Route, { page: "packs" }> }) {
     label: string;
     progress: Progress | null;
   } | null>(null);
-  const [link, setLink] = useState("");
   const [info, setInfo] = useState<{
     usage: number;
     quota: number;
@@ -192,18 +191,6 @@ export function Packs({ route }: { route: Extract<Route, { page: "packs" }> }) {
     }
     setCatalogUrl(href);
     toast("已切换单词包目录", "ok");
-  };
-
-  const submitLink = () => {
-    const u = safeUrl(link.trim());
-    if (!u) return toast("请粘贴以 https:// 开头的链接。", "warn");
-    if (u.pathname.endsWith(".json")) {
-      setLink("");
-      return void useCatalog(u.href);
-    }
-    void fromUrl([
-      { name: u.pathname.split("/").pop() || "单词包", url: u.href },
-    ]).then(() => setLink(""));
   };
 
   const byId = new Map(installed.map((p) => [p.id, p]));
@@ -429,26 +416,34 @@ export function Packs({ route }: { route: Extract<Route, { page: "packs" }> }) {
             文件：先在微信里点开它，选「保存到手机 /
             用其他应用打开」存到「文件」，再回到这里选择它。
           </p>
-          <label className="packs-link">
-            <span className="muted">或粘贴链接</span>
-            <div>
-              <input
-                type="url"
-                inputMode="url"
-                placeholder="https://…"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submitLink()}
-              />
-              <button
-                className="btn btn-ghost"
-                disabled={!!busy || !link.trim()}
-                onClick={submitLink}
-              >
-                <Link2 size={18} /> 添加
-              </button>
+          {shareUrl && (
+            <div className="packs-link">
+              <span className="muted">或者复制链接，在浏览器打开下载</span>
+              <div>
+                <a
+                  className="link packs-link-url"
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {shareUrl}
+                </a>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() =>
+                    void copyText(shareUrl).then((ok) =>
+                      toast(
+                        ok ? "链接已复制" : "请长按链接手动复制",
+                        ok ? "ok" : "warn",
+                      ),
+                    )
+                  }
+                >
+                  <Copy size={18} /> 复制
+                </button>
+              </div>
             </div>
-          </label>
+          )}
         </section>
       </div>
 

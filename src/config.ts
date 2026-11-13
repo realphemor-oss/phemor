@@ -8,7 +8,7 @@ export const REPO_URL = "https://github.com/designfuchen/word-atlas";
  */
 export const PACK_SHARE = {
   name: import.meta.env.VITE_PACK_SHARE_NAME || "夸克网盘",
-  url: import.meta.env.VITE_PACK_SHARE_URL || "",
+  url: import.meta.env.VITE_PACK_SHARE_URL || "https://pan.quark.cn/s/037efb534c29",
   code: import.meta.env.VITE_PACK_SHARE_CODE || "",
 };
 
