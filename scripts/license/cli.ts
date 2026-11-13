@@ -3,7 +3,8 @@
  *   npm run license -- init                       生成主密钥和签名密钥，把公钥写进 src/packs/issuer.ts
  *   npm run license -- release --in packs/lists --out <夸克文件夹>
  *                                                  初中包原样复制，其余四个加密后输出
- *   npm run license -- issue --customer 张三 --packs all [--device PHD1.xxx] [--days 365]
+ *   npm run license -- issue --customer 张三 --packs all [--device PHD1.xxx] [--days 365] [--show-name]
+ *       客户名只记在你自己的 issued.csv 里；加 --show-name 才把名字写进激活码，客户手机上会显示出来（威慑用）
  *   npm run license -- batch customers.csv --out codes.csv
  *   npm run license -- show <激活码>
  *   npm run license -- encrypt a.phemor b.phemor --out DIR      （release 用的底层命令）
@@ -164,7 +165,7 @@ function resolvePacks(spec: string) {
 
 const csvq = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
-async function makeCode(customer: string, packSpec: string, device: string | undefined, days: number | undefined) {
+async function makeCode(customer: string, packSpec: string, device: string | undefined, days: number | undefined, showName = false) {
   const { master, priv } = loadKeys();
   const packs = resolvePacks(packSpec);
   const lid = "L" + crypto.randomBytes(6).toString("hex");
@@ -172,7 +173,7 @@ async function makeCode(customer: string, packSpec: string, device: string | und
     signKey: await importSigningKey(priv),
     master,
     lid,
-    cust: customer,
+    cust: showName ? customer : "",
     packs: packs.map((p) => ({ id: p.id, kv: products.kv })),
     days: days ?? null,
     deviceCode: device || undefined,
@@ -186,13 +187,14 @@ async function makeCode(customer: string, packSpec: string, device: string | und
 }
 
 async function issue(o: Record<string, string>) {
-  const customer = o.customer || o.c;
-  if (!customer || customer === "true") die("用法：npm run license -- issue --customer 张三 --packs all [--device PHD1.…] [--days 365]");
+  const customer = o.customer || o.c || "（未填）";
+  if (customer === "true") die("用法：npm run license -- issue --customer 张三 --packs all [--device PHD1.…] [--days 365] [--show-name]");
+  if (o["show-name"] && customer === "（未填）") die("--show-name 需要同时写 --customer 客户名");
   const days = o.days ? Number(o.days) : undefined;
   if (days !== undefined && !(days > 0)) die("--days 必须是正数");
   if (o.device && !o.device.trim().startsWith("PHD1.")) die("设备码应以 PHD1. 开头，请让客户重新复制。");
-  const r = await makeCode(customer, o.packs || "all", o.device?.trim(), days);
-  console.log(`客户：${customer}   包：${r.packs.map((p) => p.name).join("、")}   ${r.fp ? `仅限设备 ${r.fp}` : "通用码（不绑定设备）"}   ${r.exp ? `有效至 ${r.exp}` : "长期有效"}\n`);
+  const r = await makeCode(customer, o.packs || "all", o.device?.trim(), days, !!o["show-name"]);
+  console.log(`客户（仅记录）：${customer}${o["show-name"] ? "，名字会显示在客户手机上" : "，名字不写进激活码"}   包：${r.packs.map((p) => p.name).join("、")}   ${r.fp ? `仅限设备 ${r.fp}` : "通用码（不绑定设备）"}   ${r.exp ? `有效至 ${r.exp}` : "长期有效"}\n`);
   console.log(r.code + "\n");
   console.log(`（已记入 ${file("issued.csv")}）`);
 }
@@ -236,7 +238,7 @@ async function batch(inFile: string | undefined, o: Record<string, string>) {
     const customer = get("customer");
     if (!customer) continue;
     const days = get("days") ? Number(get("days")) : undefined;
-    const res = await makeCode(customer, get("packs") || "all", get("device") || undefined, days);
+    const res = await makeCode(customer, get("packs") || "all", get("device") || undefined, days, o["show-name"] === "true");
     out.push([customer, res.packs.map((p) => p.name).join("+"), res.fp, days ?? "", res.code].map((x) => csvq(String(x))).join(","));
     console.log(`✓ ${customer}`);
   }
@@ -251,7 +253,7 @@ async function show(code: string | undefined) {
   const { pub } = loadKeys();
   try {
     const lic = await verifyLicense(code!, pub, Math.floor(Date.now() / 1000));
-    console.log(`✓ 签名有效\n  客户：${lic.cust}\n  编号：${lic.lid}\n  包：${lic.packs.join("、")}\n  设备：${lic.dev ?? "通用（不绑定）"}\n  签发：${new Date(lic.iat * 1000).toLocaleString("zh-CN")}\n  到期：${lic.exp ? new Date(lic.exp * 1000).toLocaleDateString("zh-CN") : "长期有效"}`);
+    console.log(`✓ 签名有效\n  客户名：${lic.cust || "（未写入激活码）"}\n  编号：${lic.lid}\n  包：${lic.packs.join("、")}\n  设备：${lic.dev ?? "通用（不绑定）"}\n  签发：${new Date(lic.iat * 1000).toLocaleString("zh-CN")}\n  到期：${lic.exp ? new Date(lic.exp * 1000).toLocaleDateString("zh-CN") : "长期有效"}`);
   } catch (e) {
     die(`${(e as Error).message}`);
   }

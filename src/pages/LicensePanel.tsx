@@ -55,7 +55,7 @@ export function LicensePanel({
     try {
       const rec = await activate(code);
       setCode("");
-      toast(`已激活：${rec.cust}`, "ok");
+      toast(rec.cust ? `已激活：${rec.cust}` : "已激活", "ok");
     } catch (e) {
       toast(
         e instanceof PackError ? e.message : "激活失败，请检查激活码是否完整。",
@@ -119,7 +119,7 @@ export function LicensePanel({
             return (
               <li key={l.id}>
                 <div>
-                  <b>{l.cust}</b>
+                  <b>{l.cust || "已激活"}</b>
                   <span className="muted">
                     {" · "}
                     {l.packs

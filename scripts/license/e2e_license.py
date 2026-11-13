@@ -35,8 +35,8 @@ def cli(*a):
     return sh(["npx", "tsx", "scripts/license/cli.ts", *a])
 
 
-def issue(customer, packs, device=None, days=None):
-    a = ["issue", "--customer", customer, "--packs", packs]
+def issue(customer, packs, device=None, days=None, show_name=True):
+    a = ["issue", "--customer", customer, "--packs", packs] + (["--show-name"] if show_name else [])
     if device:
         a += ["--device", device]
     if days:
@@ -228,9 +228,10 @@ with sync_playwright() as p:
     page.wait_for_timeout(400)
     dev_code = page.evaluate("navigator.clipboard.readText()")
     check("复制设备码得到 PHD1. 开头的码", dev_code.startswith("PHD1."), dev_code[:12])
-    code_bound = issue("测试丙", "高中,旅游", device=dev_code, days=30)
+    code_bound = issue("测试丙", "高中,旅游", device=dev_code, days=30, show_name=False)
     txt = activate(page, code_bound)
-    check("绑定码在本机激活成功，并显示仅限本机", "测试丙" in page.locator(".license-list").inner_text() and "仅限本机" in page.locator(".license-list").inner_text())
+    lt = page.locator(".license-list").inner_text()
+    check("不带名字的绑定码：显示「已激活」「仅限本机」，不泄露客户名", "已激活" in lt and "仅限本机" in lt and "测试丙" not in lt, lt.replace("\n", " ")[:60])
     got = import_pack(page, packs / "list-senior.phemor", ["已添加「", "请在下方「授权」"])
     check("绑定码安装加密包成功", got == "已添加「", str(got))
     check("绑定设备装出的图片同样正确", stored_ok(page, senior_ids[0]) == "RIFF")
