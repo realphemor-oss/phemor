@@ -323,3 +323,5 @@
 }
 
 .diag-text{margin:12px 0 0;padding:12px;border-radius:12px;background:var(--surface-2,rgba(127,127,127,.12));font:12px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;user-select:text;-webkit-user-select:text}
+.settings-level{display:grid;gap:8px;margin-bottom:20px}
+.settings-level>small{color:var(--ink-3);font-size:12.5px;line-height:1.5}

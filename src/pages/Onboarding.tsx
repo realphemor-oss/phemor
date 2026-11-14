@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAtlas } from "../atlas/context";
 import { store } from "../store/store";
 
-const LEVELS = [
+export const LEVELS = [
   ["A2", "基础", "日常词还不太稳"],
   ["B1", "进阶", "目标 5.5 – 6 分"],
   ["B2", "中高", "目标 6.5 – 7 分"],

@@ -4,6 +4,7 @@ import { useAtlas } from "../atlas/context";
 import { isMastered } from "../store/srs";
 import { dayKey, exportBackup, importBackup, resetProgress, store, useStore, type Settings } from "../store/store";
 import { toast } from "../ui/Toast";
+import { LEVELS } from "./Onboarding";
 import { probe, report } from "../lib/diag";
 import { copyText } from "../packs/pwa";
 import { streakOf } from "./Today";
@@ -110,21 +111,28 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
         </section>
 
         <section className="panel settings">
-          <h3 className="eyebrow">学习设置</h3>
+          <h3 className="eyebrow">学习目标与设置</h3>
+          <div className="settings-level">
+            <b>你从哪里出发？</b>
+            <small>随时可以重新选择，跳过已经熟悉的低级别词。当前起点：{atlas.cefr[settings.startLevel] ?? "A1"}</small>
+            <div className="choice-grid">
+              {LEVELS.map(([code, name, desc]) => {
+                const at = atlas.cefr.indexOf(code);
+                return (
+                  <button key={code} className={`choice ${settings.startLevel === at ? "is-on" : ""}`} onClick={() => set({ startLevel: at })} aria-pressed={settings.startLevel === at}>
+                    <span className={`chip chip-level lv-${code}`}>{code}</span>
+                    <b>{name}</b>
+                    <small>{desc}</small>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <Field label="每日新词" hint="复习不设上限，算法只安排快要遗忘的词。">
             <div className="segmented">
               {[5, 10, 15, 20, 30].map((n) => (
                 <button key={n} className={settings.dailyNew === n ? "is-on" : ""} onClick={() => set({ dailyNew: n })}>
                   {n}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="从哪个难度开始" hint="跳过已经熟悉的低级别词。">
-            <div className="segmented">
-              {atlas.cefr.map((l, i) => (
-                <button key={l} className={settings.startLevel === i ? "is-on" : ""} onClick={() => set({ startLevel: i })}>
-                  {l}
                 </button>
               ))}
             </div>
