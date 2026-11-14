@@ -1,16 +1,17 @@
 /* 非莫离线服务。
- * - 页面：优先联网（1.5 秒没回应就用本机缓存），所以信号差也能快速打开。
- * - 词库目录 index.json：先用本机缓存立刻显示，同时在后台更新，下次打开就是新的。
- * - 其余文件（插画、发音、词条、脚本）：本机有就直接用，没有再联网并记住。
+ * - 页面、脚本、样式、词库目录、词条文字：优先联网（浏览器自己的 HTTP 缓存几毫秒就能答），
+ *   联网不通或太慢才用本机缓存，所以信号差、离线也能打开。
+ * - 插画和发音：本机有就直接用（先 App 自己的缓存，再 phemor-packs 单词包缓存），没有再联网并记住。
  * - 单词包写入的 phemor-packs 缓存永远不会被这里清理，只能在 App 里移除。
- * - 只有插画/发音请求才会去查 phemor-packs：苹果系统第一次打开这个缓存要把里面几万条记录读一遍，
- *   网页、脚本、词库目录绝不能等它，否则装了单词包的 App 每次启动都要卡很久。
+ * - 重要：苹果系统第一次用 Cache Storage 时，要把里面几万条单词包记录整体读一遍，实测要 17 秒以上，
+ *   这段时间里所有 caches 调用都排队。所以联网能答的请求绝不先碰 caches，保存离线副本也要等它醒来之后。
  * - 支持 Range 请求：iPhone 播放音频必须靠它，否则离线时发音会失效。 */
 const VERSION = "atlas-v2";
 const SHELL = `${VERSION}-shell`;
 const MEDIA = `${VERSION}-media`;
 const PACKS = "phemor-packs";
 const NETWORK_WAIT = 1500;
+const ASSET_WAIT = 4000;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
@@ -98,19 +99,42 @@ async function lookup(req) {
 }
 
 // Start reading the packs cache index in the background as soon as the worker wakes up,
-// so by the time the first picture is wanted it is usually ready. Nothing waits for this.
-caches
+// so by the time the first picture is wanted it is usually ready. Nothing waits for this
+// except the pictures and recordings themselves, and the saving of fresh copies below.
+const cacheReady = caches
   .has(PACKS)
-  .then((has) => has && caches.open(PACKS).then((c) => c.match(new URL("./atlas/thumb/.warm", self.registration.scope).href)))
-  .catch(() => null);
+  .then((has) => (has ? caches.open(PACKS).then((c) => c.match(new URL("./atlas/thumb/.warm", self.registration.scope).href)) : null))
+  .then(() => undefined, () => undefined);
 
-async function networkFirst(req) {
+/**
+ * Keep a copy of a fresh answer for offline use. It waits until the cache storage has finished waking up
+ * (so it does not slow that down) and no reply ever waits for it. On an iPhone with big word packs the first
+ * touch of Cache Storage can take well over ten seconds; every request that needs it stalls until it is done.
+ */
+function saveLater(event, url, res) {
+  if (!res.ok || res.type !== "basic") return;
+  const copy = res.clone();
+  let release = () => undefined;
+  try {
+    event.waitUntil(new Promise((r) => (release = r)));
+  } catch {
+    /* the worker may be stopped before the copy is saved; the next visit saves it again */
+  }
+  const timer = setTimeout(() => release(), 60000);
+  cacheReady
+    .then(() => caches.open(SHELL))
+    .then((c) => c.put(url, copy))
+    .catch(() => null)
+    .then(() => {
+      clearTimeout(timer);
+      release();
+    });
+}
+
+async function networkFirst(event, req) {
   const cached = () => lookup(req).then((hit) => hit || fromCache(SHELL, new URL("./", self.registration.scope).href));
   const net = fetch(req).then((res) => {
-    if (res.ok) {
-      const copy = res.clone();
-      caches.open(SHELL).then((c) => c.put(req.url, copy));
-    }
+    saveLater(event, req.url, res);
     return res;
   });
   const wait = new Promise((resolve) => setTimeout(resolve, NETWORK_WAIT, null));
@@ -124,20 +148,28 @@ async function networkFirst(req) {
   }
 }
 
-async function staleWhileRevalidate(event, req) {
-  const hit = await lookup(req);
+/**
+ * The app itself (scripts, styles, the word index, entry text): ask the network first. The browser's own HTTP
+ * cache answers in a few milliseconds, and the Cache Storage copy is only the offline fallback. It is never
+ * consulted while the network answers, because on a phone with word packs installed that is the slow part.
+ */
+async function assetFirst(event, req) {
+  if (self.navigator && self.navigator.onLine === false) {
+    const hit = await lookup(req);
+    if (hit) return hit;
+  }
   const net = fetch(req).then((res) => {
-    if (res.ok) {
-      const copy = res.clone();
-      caches.open(SHELL).then((c) => c.put(req.url, copy));
-    }
+    saveLater(event, req.url, res);
     return res;
   });
-  if (hit) {
-    event.waitUntil(net.catch(() => null));
-    return hit;
+  const wait = new Promise((resolve) => setTimeout(resolve, ASSET_WAIT, null));
+  try {
+    const first = await Promise.race([net.catch(() => null), wait.then(() => lookup(req))]);
+    if (first) return first;
+    return await net;
+  } catch {
+    return (await lookup(req)) || Response.error();
   }
-  return net;
 }
 
 async function cacheFirst(req) {
@@ -152,7 +184,7 @@ async function cacheFirst(req) {
   if (res.ok && res.type === "basic") {
     const copy = res.clone();
     const url = new URL(req.url);
-    const name = /\/atlas\/(img|thumb|audio)\//.test(url.pathname) ? MEDIA : SHELL;
+    const name = isMediaUrl(url.pathname) ? MEDIA : SHELL;
     caches
       .open(name)
       .then((c) => c.put(req.url, copy))
@@ -167,6 +199,5 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin || !req.url.startsWith(self.registration.scope)) return;
   const isPage = req.mode === "navigate";
-  const isIndex = url.pathname.endsWith("/atlas/index.json");
-  event.respondWith(isPage ? networkFirst(req) : isIndex ? staleWhileRevalidate(event, req) : cacheFirst(req));
+  event.respondWith(isPage ? networkFirst(event, req) : isMediaUrl(req.url) ? cacheFirst(req) : assetFirst(event, req));
 });
