@@ -1,10 +1,12 @@
 import { Download, RotateCcw, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAtlas } from "../atlas/context";
 import { isMastered } from "../store/srs";
+import { buildSession } from "../store/session";
 import { dayKey, exportBackup, importBackup, resetProgress, store, useStore, type Settings } from "../store/store";
 import { toast } from "../ui/Toast";
 import { LEVELS } from "./Onboarding";
+import { go } from "../lib/router";
 import { probe, report } from "../lib/diag";
 import { copyText } from "../packs/pwa";
 import { streakOf } from "./Today";
@@ -36,6 +38,22 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
   }, [progress]);
 
   const set = (patch: Partial<Settings>) => store.settings(patch);
+  // Starting level and daily new words reshape today's journey, so they are chosen first and applied with a button.
+  const [draft, setDraft] = useState({ level: settings.startLevel, daily: settings.dailyNew });
+  useEffect(() => setDraft({ level: settings.startLevel, daily: settings.dailyNew }), [settings.startLevel, settings.dailyNew]);
+  const changed = draft.level !== settings.startLevel || draft.daily !== settings.dailyNew;
+  const applyPlan = () => {
+    const next = { ...settings, startLevel: draft.level, dailyNew: draft.daily };
+    set({ startLevel: draft.level, dailyNew: draft.daily });
+    // The journey laid out for today was built with the old choices: replace it at once with one built from the new
+    // ones, and give the full number of new words again on top of whatever was already learned today.
+    const { progress: now } = store.get();
+    const learnedToday = now.days[dayKey()]?.n ?? 0;
+    const session = buildSession(atlas, { ...now, session: null }, { ...next, dailyNew: learnedToday + draft.daily });
+    store.progress((p) => ({ ...p, session: session.steps.length ? session : null }));
+    toast(`已按新的起点重新安排：再点亮 ${draft.daily} 颗新星`, "ok");
+    go({ page: "today" });
+  };
   const download = () => {
     const blob = new Blob([exportBackup()], { type: "application/json" });
     const a = document.createElement("a");
@@ -114,12 +132,12 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
           <h3 className="eyebrow">学习目标与设置</h3>
           <div className="settings-level">
             <b>你从哪里出发？</b>
-            <small>随时可以重新选择，跳过已经熟悉的低级别词。当前起点：{atlas.cefr[settings.startLevel] ?? "A1"}</small>
+            <small>跳过已经熟悉的低级别词。选好后点下面的「确定」。当前起点：{atlas.cefr[settings.startLevel] ?? "A1"}</small>
             <div className="choice-grid">
               {LEVELS.map(([code, name, desc]) => {
                 const at = atlas.cefr.indexOf(code);
                 return (
-                  <button key={code} className={`choice ${settings.startLevel === at ? "is-on" : ""}`} onClick={() => set({ startLevel: at })} aria-pressed={settings.startLevel === at}>
+                  <button key={code} className={`choice ${draft.level === at ? "is-on" : ""}`} onClick={() => setDraft((d) => ({ ...d, level: at }))} aria-pressed={draft.level === at}>
                     <span className={`chip chip-level lv-${code}`}>{code}</span>
                     <b>{name}</b>
                     <small>{desc}</small>
@@ -131,12 +149,22 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
           <Field label="每日新词" hint="复习不设上限，算法只安排快要遗忘的词。">
             <div className="segmented">
               {[5, 10, 15, 20, 30].map((n) => (
-                <button key={n} className={settings.dailyNew === n ? "is-on" : ""} onClick={() => set({ dailyNew: n })}>
+                <button key={n} className={draft.daily === n ? "is-on" : ""} onClick={() => setDraft((d) => ({ ...d, daily: n }))}>
                   {n}
                 </button>
               ))}
             </div>
           </Field>
+          {changed && (
+            <div className="settings-apply">
+              <button className="btn btn-primary" onClick={applyPlan}>
+                确定，立刻按新的起点排新词
+              </button>
+              <button className="btn btn-ghost" onClick={() => setDraft({ level: settings.startLevel, daily: settings.dailyNew })}>
+                取消
+              </button>
+            </div>
+          )}
           <Field label="目标记忆率" hint="越高复习越频繁。90% 是大多数人的甜点。">
             <div className="segmented">
               {[0.85, 0.9, 0.95].map((n) => (
