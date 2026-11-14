@@ -1,6 +1,6 @@
 import type { Atlas, Entry, IndexRow, WordRef } from "./types";
 import { MEDIA } from "./types";
-import type { Extras } from "../packs/spec";
+import { SHELL_CACHE, type Extras } from "../packs/spec";
 import { mergeWords } from "./merge";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -67,10 +67,12 @@ export async function warmEntries(signal?: { cancelled: boolean }) {
   if (!navigator.serviceWorker.controller) return;
   const idx = await fetchIndex();
   const chunks = Math.ceil(idx.words.length / idx.chunk);
+  // Look only in the app's own cache: caches.match() would also open the huge word-pack cache.
+  const shell = await caches.open(SHELL_CACHE);
   for (let n = 0; n < chunks; n++) {
     if (signal?.cancelled || !navigator.onLine) return;
     const target = new URL(url(`entries/${n}.json`), location.origin).href;
-    if (await caches.match(target)) continue;
+    if (await shell.match(target)) continue;
     try {
       const res = await fetch(target);
       if (res.ok) await res.arrayBuffer();

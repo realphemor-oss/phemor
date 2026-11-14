@@ -1,6 +1,7 @@
 import { ArrowRight, Flame, Keyboard, Sparkles } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { prefetch, useAtlas, useEntry } from "../atlas/context";
+import { warmWords } from "../atlas/warm";
 import { go, openWord } from "../lib/router";
 import { cue } from "../lib/sound";
 import { hashSeed } from "../lib/text";
@@ -39,13 +40,24 @@ export function Today() {
   const progress = useStore((s) => s.progress);
   const settings = useStore((s) => s.settings);
   const plan = useMemo(() => todayPlan(atlas, progress, settings), [atlas, progress, settings]);
-  // Warm the first cards of today's journey so the session opens instantly.
+  // Warm today's journey while the person looks at this screen: the entry text of the first cards, then the
+  // pictures and recordings of the reviews due (from yesterday's progress) and the next new words.
   const firstIds = [...plan.due.slice(0, 4), ...plan.fresh.slice(0, 6)].join(",");
+  const warmIds = [...plan.due.slice(0, 14), ...plan.fresh.slice(0, 14)].join(",");
   useEffect(() => {
     const ids = firstIds.split(",").filter(Boolean);
     const t = window.setTimeout(() => void prefetch(atlas, ids), 800);
     return () => window.clearTimeout(t);
   }, [atlas, firstIds]);
+  useEffect(() => {
+    const ids = warmIds.split(",").filter(Boolean);
+    let live = true;
+    const t = window.setTimeout(() => void warmWords(atlas, ids, settings.accent, 8, () => !live), 1200);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [atlas, warmIds, settings.accent]);
   const now = new Date();
   const today = progress.days[dayKey()];
   const streak = streakOf(progress.days);

@@ -3,6 +3,8 @@
  * - 词库目录 index.json：先用本机缓存立刻显示，同时在后台更新，下次打开就是新的。
  * - 其余文件（插画、发音、词条、脚本）：本机有就直接用，没有再联网并记住。
  * - 单词包写入的 phemor-packs 缓存永远不会被这里清理，只能在 App 里移除。
+ * - 只有插画/发音请求才会去查 phemor-packs：苹果系统第一次打开这个缓存要把里面几万条记录读一遍，
+ *   网页、脚本、词库目录绝不能等它，否则装了单词包的 App 每次启动都要卡很久。
  * - 支持 Range 请求：iPhone 播放音频必须靠它，否则离线时发音会失效。 */
 const VERSION = "atlas-v2";
 const SHELL = `${VERSION}-shell`;
@@ -77,14 +79,33 @@ async function sliceResponse(hit, rangeHeader) {
   });
 }
 
-async function lookup(req) {
-  // Word packs first, then everything else we have cached.
-  const packs = await caches.open(PACKS);
-  return (await packs.match(req.url)) || (await caches.match(req.url));
+const isMediaUrl = (url) => /\/atlas\/(img|thumb|audio)\//.test(url);
+
+async function fromCache(name, url) {
+  try {
+    return await (await caches.open(name)).match(url);
+  } catch {
+    return undefined;
+  }
 }
 
+/** Never uses the global caches.match(): that would open the (huge) packs cache for every request. */
+async function lookup(req) {
+  const url = req.url;
+  if (!isMediaUrl(url)) return (await fromCache(SHELL, url)) || (await fromCache(MEDIA, url));
+  // Pictures and recordings: the small caches first, then the word packs.
+  return (await fromCache(MEDIA, url)) || (await fromCache(PACKS, url)) || (await fromCache(SHELL, url));
+}
+
+// Start reading the packs cache index in the background as soon as the worker wakes up,
+// so by the time the first picture is wanted it is usually ready. Nothing waits for this.
+caches
+  .has(PACKS)
+  .then((has) => has && caches.open(PACKS).then((c) => c.match(new URL("./atlas/thumb/.warm", self.registration.scope).href)))
+  .catch(() => null);
+
 async function networkFirst(req) {
-  const cached = () => lookup(req).then((hit) => hit || caches.match(new URL("./", self.registration.scope).href));
+  const cached = () => lookup(req).then((hit) => hit || fromCache(SHELL, new URL("./", self.registration.scope).href));
   const net = fetch(req).then((res) => {
     if (res.ok) {
       const copy = res.clone();

@@ -13,6 +13,8 @@ import type { Entry, IndexRow } from "../atlas/types";
 export const PACK_FORMAT = 1;
 export const PACK_FORMAT_ENCRYPTED = 2;
 export const PACK_CACHE = "phemor-packs";
+/** The service worker's cache for the app itself; keep in step with VERSION in public/sw.js. */
+export const SHELL_CACHE = "atlas-v2-shell";
 export const PACK_EXT = ".phemor";
 
 export class PackError extends Error {}
