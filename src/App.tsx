@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { armCues } from "./lib/sound";
 import { AtlasContext, useAtlas, useEntry } from "./atlas/context";
 import { loadOpenAtlas, loadPrivateAtlas, warmEntries } from "./atlas/data";
-import { loadExtras, loadExtrasStaged, PACKS_CHANGED } from "./packs/install";
+import { loadExtras, loadExtrasStaged, PACKS_CHANGED, syncLegacyFlag } from "./packs/install";
 import type { Atlas } from "./atlas/types";
 import { REPO_URL } from "./config";
 import { closeWord, currentLocation, go, openWord, useLocation, type Route } from "./lib/router";
@@ -95,6 +95,7 @@ export default function App() {
         },
         () => !live || mine !== round,
       ).catch(() => null);
+      void syncLegacyFlag();
     };
     void start();
     // Once the app is up and the offline worker is in charge, quietly save all entry text.

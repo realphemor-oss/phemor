@@ -167,8 +167,9 @@ python3 scripts/pack/build_packs.py kit --id kit-lite --name "精简包" --level
 ## 10. 开发者笔记
 
 - 包格式：`pack.json`（`format:1`，`id`，`name`，`version`，…）+ 可选 `words.json`（`{rows, entries}`）+ `files/<站内路径>`。路径白名单见 `src/packs/spec.ts`（只允许 `atlas/`、`sfx/`、`brand/` 下的图片、音频、词条 JSON）。导入时所有来自包的数据都会被重新校验和裁剪（外部媒体地址会被丢弃）。
-- 文件存放在 Cache Storage 的 `phemor-packs`，键就是原来的站内网址，所以页面代码不用改；`sw.js` 先查它，再查其他缓存，最后联网，并支持 Range（iPhone 播放音频必需）。该缓存不会被 `sw.js` 的版本升级清理。
+- 文件（图片、发音）存放在 IndexedDB `phemor-packs` 的 `files` 仓库，一个文件一条记录，键是原来的完整站内网址（`urlFor(path)`），所以页面代码不用改；`sw.js` 先查它，再查小缓存，最后（仅当还有旧格式的包）查 Cache Storage `phemor-packs`，都没有再联网，并支持 Range（iPhone 播放音频必需）。
+- 为什么不用 Cache Storage：iPhone 第一次碰一个存了几万个文件的 Cache Storage，要把全部记录读一遍，实测 16 秒以上，这期间所有 `caches.*` 调用都排队，App 启动被拖住。数据库按键取值不受影响。旧格式（`InstalledPack.store` 缺失）的包仍然能用，只是启动慢；移除后重新添加就会换成新格式。`meta/legacy` 记录告诉 `sw.js` 还有没有旧格式的包。
 - 词条文字存在 IndexedDB（`phemor-packs`），启动时和 `atlas/index.json` 合并（`src/atlas/merge.ts`）。
 - 后台预载：`src/atlas/data.ts` 的 `warmEntries()` 在页面空闲时逐个请求 `atlas/entries/N.json`（间隔 150 ms，省流量模式和断网时跳过）。
-- `index.json` 和页面本身「联网优先，3 秒无响应就用本机缓存」，信号差时也能秒开；其余文件「本机有就直接用」。
+- 页面、脚本、样式、`index.json`、词条文字都是「联网优先（浏览器 HTTP 缓存几毫秒就答），联网失败或 4 秒无响应才用本机副本」，副本在 Cache Storage 醒来后才保存，不拖慢首屏；图片发音「本机有就直接用」。
 - 测试：`npm test`（格式、合并逻辑）；`npm run packs:verify`（检查生成的包）；`scripts/pack/e2e.py`（真实浏览器里走一遍：预载词条、夸克卡片、下载、导入、断网、断网后播放发音；先用 `scripts/pack/make_e2e_fixture.py` 生成测试站点，用法见文件头，需要 Playwright）。

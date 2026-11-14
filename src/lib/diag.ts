@@ -1,3 +1,4 @@
+import { idbCountFiles, idbGet } from "../packs/idb";
 import { PACK_CACHE, SHELL_CACHE } from "../packs/spec";
 
 /** Start-up timings, so a slow launch on a real phone can be read instead of guessed at. Nothing leaves the device. */
@@ -33,6 +34,11 @@ export async function probe() {
     r.onsuccess = () => (r.result.close(), res());
     r.onerror = () => rej(r.error);
   }));
+  let count = 0;
+  await timed("数据库：数一数单词包文件", out, async () => (count = await idbCountFiles()));
+  out.push(`数据库里的单词包文件：${count} 个（0 个表示单词包还是旧格式，重装后会变快）`);
+  const probeFile = new URL(`${base}atlas/thumb/.probe`, location.origin).href;
+  await timed("数据库：读一个文件", out, () => idbGet(probeFile, "files"));
   return out;
 }
 

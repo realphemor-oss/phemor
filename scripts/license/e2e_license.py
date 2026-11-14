@@ -170,12 +170,24 @@ def activate(page, code):
 
 
 def ncache(page):
-    return page.evaluate("caches.has('phemor-packs').then(h => h ? caches.open('phemor-packs').then(c => c.keys()).then(k => k.length) : 0)")
+    """数据库里的单词包文件数（单词包的图片和发音存在 IndexedDB 的 files 里）。"""
+    return page.evaluate("""() => new Promise(res => {
+        const r = indexedDB.open('phemor-packs');
+        r.onerror = () => res(0);
+        r.onsuccess = () => {
+            const db = r.result;
+            if (!db.objectStoreNames.contains('files')) { db.close(); return res(0); }
+            const q = db.transaction('files').objectStore('files').count();
+            q.onsuccess = () => { db.close(); res(q.result); };
+            q.onerror = () => { db.close(); res(0); };
+        };
+    })""")
 
 
 def stored_ok(page, wid):
-    return page.evaluate("""(w) => caches.open('phemor-packs').then(c => c.match('/words/atlas/img/' + w + '.webp')).then(async r => {
-        if (!r) return null; const b = new Uint8Array(await r.arrayBuffer()); return Array.from(b.slice(0, 4)).map(x => String.fromCharCode(x)).join('') })""", wid)
+    """通过离线服务（它从数据库里取）读这张图，返回开头 4 个字节。"""
+    return page.evaluate("""(w) => fetch('/words/atlas/img/' + w + '.webp').then(async r => {
+        if (!r.ok) return null; const b = new Uint8Array(await r.arrayBuffer()); return Array.from(b.slice(0, 4)).map(x => String.fromCharCode(x)).join('') })""", wid)
 
 
 def img_width(page, wid):
@@ -194,11 +206,11 @@ with sync_playwright() as p:
 
     got = import_pack(page, packs / "list-senior.phemor", ["请在下方「授权」", "已添加「"])
     check("没有激活码：加密包被拒绝并提示", got == "请在下方「授权」", str(got))
-    check("被拒绝时没有任何文件写入缓存", ncache(page) == 0, str(ncache(page)))
+    check("被拒绝时没有任何文件写入", ncache(page) == 0, str(ncache(page)))
 
     got = import_pack(page, packs / "list-junior.phemor", ["已添加「", "请在下方「授权」"])
     check("初中包（明文基础包）不需要激活码", got == "已添加「", str(got))
-    check("初中包 9 个文件进了缓存", ncache(page) == 9, str(ncache(page)))
+    check("初中包 9 个文件进了数据库", ncache(page) == 9, str(ncache(page)))
 
     txt = activate(page, "PHEMOR1.abc")
     check("残缺的激活码被拒绝", page.locator(".license-list li").count() == 0 and "激活码" in txt)
@@ -214,7 +226,9 @@ with sync_playwright() as p:
     got = import_pack(page, packs / "list-senior.phemor", ["已添加「", "请在下方「授权」"])
     check("激活后加密的高中包安装成功", got == "已添加「", str(got))
     check("高中包又加 9 个文件，共 18", ncache(page) == 18, str(ncache(page)))
-    check("缓存里存的是解密后的图片（RIFF），不是密文", stored_ok(page, senior_ids[0]) == "RIFF", str(stored_ok(page, senior_ids[0])))
+    check("数据库里存的是解密后的图片（RIFF），不是密文", stored_ok(page, senior_ids[0]) == "RIFF", str(stored_ok(page, senior_ids[0])))
+    check("新装的单词包不再写 Cache Storage（避免苹果上 16 秒冷启动）", page.evaluate("caches.has('phemor-packs')") is False)
+    check("App 告诉离线服务：没有旧格式的包了", page.evaluate("""() => new Promise(res => { const r = indexedDB.open('phemor-packs'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('legacy'); q.onsuccess = () => { r.result.close(); res(q.result && q.result.value); }; }; })""") is False)
     check("解密后的图片能正常显示", img_width(page, senior_ids[0]) > 0, str(img_width(page, senior_ids[0])))
     check("激活码在刷新后仍然保留", (page.reload(), page.wait_for_selector(".license-list li", timeout=10000))[1] is not None)
     page.get_by_role("button", name="移除这个激活码").click()
@@ -243,8 +257,44 @@ with sync_playwright() as p:
     check("绑定码拷到另一台设备上无法激活", page.locator(".license-list li").count() == 0 and "已激活" not in txt)
     got = import_pack(page, packs / "list-senior.phemor", ["已添加「", "请在下方「授权」"])
     check("另一台设备也装不了加密包", got == "请在下方「授权」", str(got))
-    check("另一台设备缓存仍为空", ncache(page) == 0)
+    check("另一台设备仍为空", ncache(page) == 0)
     ctx.close()
+
+    # ===== 设备 D：联网序列号激活（用假的 /api/activate 应答，真实的服务端逻辑有 worker 的单元测试） =====
+    ctx, page = new_page(b, "D")
+    page.get_by_role("button", name="复制设备码").click()
+    page.wait_for_timeout(400)
+    dev_d = page.evaluate("navigator.clipboard.readText()")
+    code_d = issue("序列号客户", "高中", device=dev_d, days=None, show_name=False)
+    seen = {}
+
+    def fake_api(route):
+        req = route.request
+        seen["body"] = req.post_data_json
+        if seen.get("mode") == "full":
+            route.fulfill(status=409, content_type="application/json", body=json.dumps({"ok": False, "error": "limit", "message": "这个序列号已在 6 台设备上激活，名额已满。需要换设备请联系老师。", "max": 6}))
+        else:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "code": code_d, "packs": ["list-senior"], "used": 2, "max": 6, "remaining": 4}))
+
+    page.route("**/api/activate", fake_api)
+    page.fill(".license-paste input", "abcd efgh-jkmn pqrs")
+    page.get_by_role("button", name="激活").click()
+    page.wait_for_function("document.body.innerText.includes('已用 2/6')", timeout=15000)
+    check("序列号激活成功并提示用了几台", "已用 2/6" in body(page))
+    check("发给服务器的是规范化的序列号和本机设备码", seen["body"]["serial"].replace("-", "") == "ABCDEFGHJKMNPQRS" and seen["body"]["device"] == dev_d, str(seen["body"])[:80])
+    check("序列号激活后授权列表出现一条", page.locator(".license-list li").count() == 1)
+    got = import_pack(page, packs / "list-senior.phemor", ["已添加「", "请在下方「授权」"])
+    check("用序列号换来的激活码能装加密包", got == "已添加「", str(got))
+    check("序列号换来的包图片正确", stored_ok(page, senior_ids[0]) == "RIFF")
+    page.locator(".license-list button").first.click()
+    page.wait_for_timeout(300)
+    seen["mode"] = "full"
+    page.fill(".license-paste input", "WXYZ-2345-6789-ABCD")
+    page.get_by_role("button", name="激活").click()
+    page.wait_for_function("document.body.innerText.includes('名额已满')", timeout=15000)
+    check("名额已满时把服务器的提示原样显示", "名额已满" in body(page) and page.locator(".license-list li").count() == 0)
+    ctx.close()
+
     b.close()
 
 check("没有页面脚本错误", not errors, "; ".join(errors)[:200])

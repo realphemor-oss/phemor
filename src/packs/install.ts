@@ -1,6 +1,6 @@
 import type { Entry, IndexRow } from "../atlas/types";
 import { decryptBytes } from "./crypto";
-import { idbAll, idbDelete, idbGet, idbKeys, idbPut } from "./idb";
+import { idbAll, idbDelete, idbDeleteFiles, idbGet, idbKeys, idbPut, idbPutFiles, type StoredFile } from "./idb";
 import { keyForPack } from "./license";
 import { allowedFile, checkManifest, PACK_CACHE, PackError, sanitizeWords, type Extras, type PackManifest } from "./spec";
 import { crc32, readZipDirectory, readZipEntry, type ZipEntry } from "./zip";
@@ -18,6 +18,8 @@ export interface InstalledPack {
   paths: string[];
   rows: IndexRow[];
   entries: Entry[];
+  /** "idb": the files live in the database (fast start-up). Missing: older install in Cache Storage. */
+  store?: "idb";
 }
 
 export interface Progress {
@@ -167,26 +169,40 @@ export async function installPack(blob: Blob, opts: InstallOptions): Promise<Ins
   // 用第一个文件试解密：密钥不对时立刻报错，不会留下写了一半的内容
   if (key && files.length) await decryptBytes(key, await readZipEntry(blob, files[0].e), manifest.id, files[0].path);
 
-  const cache = await caches.open(PACK_CACHE);
+  // Files go into the database, not Cache Storage: on an iPhone the first touch of a Cache Storage holding tens of
+  // thousands of files takes over ten seconds and stalls everything else that uses it.
   const total = files.length;
   let done = 0;
   let bytes = 0;
   const paths: string[] = [];
   const queue = files.slice();
+  let batch: StoredFile[] = [];
+  let batchBytes = 0;
+  let writing: Promise<void> = Promise.resolve();
+  const flush = () => {
+    const out = batch;
+    batch = [];
+    batchBytes = 0;
+    writing = writing.then(() => idbPutFiles(out));
+    return writing;
+  };
   const worker = async () => {
     for (let f = queue.shift(); f; f = queue.shift()) {
       abort();
       const stored = await readZipEntry(blob, f.e);
       const data = key ? await decryptBytes(key, stored, manifest.id, f.path) : stored;
-      await cache.put(urlFor(f.path), new Response(data, { headers: { "Content-Type": f.type, "Content-Length": String(data.length) } }));
+      batch.push({ id: urlFor(f.path), type: f.type, data: new Blob([data], { type: f.type }) });
+      batchBytes += data.length;
       bytes += data.length;
       paths.push(f.path);
       onProgress?.({ phase: "write", done: ++done, total });
+      if (batch.length >= 40 || batchBytes >= 6e6) await flush(); // also keeps memory in check
     }
   };
   onProgress?.({ phase: "write", done: 0, total });
   try {
     await Promise.all(Array.from({ length: 6 }, worker));
+    await flush();
   } catch (err) {
     if (err instanceof PackError) throw err;
     throw new PackError("手机存储空间不足，或浏览器拒绝保存。请清理空间后重试。");
@@ -194,25 +210,46 @@ export async function installPack(blob: Blob, opts: InstallOptions): Promise<Ins
 
   const old = (await listInstalled()).find((p) => p.id === manifest.id);
   const seq = old?.seq ?? Math.max(0, ...(await listInstalled()).map((p) => p.seq)) + 1;
-  const record: InstalledPack = { id: manifest.id, manifest, installed: Date.now(), seq, bytes, paths, rows: words.rows, entries: words.entries };
+  const record: InstalledPack = { id: manifest.id, manifest, installed: Date.now(), seq, bytes, paths, rows: words.rows, entries: words.entries, store: "idb" };
   await idbPut(record);
   // A reinstall that no longer ships some files should not leave them behind.
-  if (old) {
-    const keep = new Set(paths);
-    await Promise.all(old.paths.filter((p) => !keep.has(p)).map((p) => cache.delete(urlFor(p))));
-  }
+  if (old) await dropFiles(old, old.store === "idb" ? new Set(paths) : new Set());
+  void syncLegacyFlag();
   void requestPersist();
   window.dispatchEvent(new Event(PACKS_CHANGED));
   return record;
 }
 
+/** Delete a pack's files, wherever they were stored; `keep` lists paths that a newer install still ships. */
+async function dropFiles(rec: InstalledPack, keep: Set<string> = new Set()) {
+  const gone = rec.paths.filter((p) => !keep.has(p));
+  if (rec.store === "idb") await idbDeleteFiles(gone.map(urlFor));
+  else {
+    const cache = await caches.open(PACK_CACHE);
+    await Promise.all(gone.map((p) => cache.delete(urlFor(p))));
+  }
+}
+
 export async function removePack(id: string) {
   const rec = (await listInstalled()).find((p) => p.id === id);
   if (!rec) return;
-  const cache = await caches.open(PACK_CACHE);
-  await Promise.all(rec.paths.map((p) => cache.delete(urlFor(p))));
+  await dropFiles(rec);
   await idbDelete(id);
+  void syncLegacyFlag();
   window.dispatchEvent(new Event(PACKS_CHANGED));
+}
+
+/** True while some installed pack still keeps its files in the old Cache Storage (slow to start on iPhone). */
+export const isLegacy = (p: InstalledPack) => p.store !== "idb";
+
+/** Tell the service worker whether it still has to look in the old Cache Storage for pictures and recordings. */
+export async function syncLegacyFlag() {
+  try {
+    const legacy = (await idbAll<InstalledPack>()).some(isLegacy);
+    await idbPut({ id: "legacy", value: legacy }, "meta");
+  } catch {
+    /* the worker then assumes the old storage may be in use, which is always safe */
+  }
 }
 
 /** Download a pack with progress; the result is a Blob the browser can keep on disk. */

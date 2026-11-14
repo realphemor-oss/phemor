@@ -1,8 +1,8 @@
 /* 非莫离线服务。
  * - 页面、脚本、样式、词库目录、词条文字：优先联网（浏览器自己的 HTTP 缓存几毫秒就能答），
  *   联网不通或太慢才用本机缓存，所以信号差、离线也能打开。
- * - 插画和发音：本机有就直接用（先 App 自己的缓存，再 phemor-packs 单词包缓存），没有再联网并记住。
- * - 单词包写入的 phemor-packs 缓存永远不会被这里清理，只能在 App 里移除。
+ * - 插画和发音：先查数据库（新装的单词包都在这里，毫秒级），再查 App 自己的小缓存，最后才查旧格式单词包的 phemor-packs 缓存；都没有再联网并记住。
+ * - 单词包（数据库和旧的 phemor-packs 缓存）永远不会被这里清理，只能在 App 里移除。
  * - 重要：苹果系统第一次用 Cache Storage 时，要把里面几万条单词包记录整体读一遍，实测要 17 秒以上，
  *   这段时间里所有 caches 调用都排队。所以联网能答的请求绝不先碰 caches，保存离线副本也要等它醒来之后。
  * - 支持 Range 请求：iPhone 播放音频必须靠它，否则离线时发音会失效。 */
@@ -90,20 +90,76 @@ async function fromCache(name, url) {
   }
 }
 
-/** Never uses the global caches.match(): that would open the (huge) packs cache for every request. */
+// ---- Word packs live in the database (IndexedDB), one record per file, keyed by its full address. ----
+const IDB_NAME = "phemor-packs";
+const IDB_VERSION = 3;
+const IDB_STORES = ["packs", "licenses", "device", "files", "meta"];
+let dbPromise = null;
+function openDb() {
+  dbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      for (const s of IDB_STORES) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s, { keyPath: "id" });
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
+  });
+  return dbPromise;
+}
+async function dbGet(store, key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const q = db.transaction(store, "readonly").objectStore(store).get(key);
+    q.onsuccess = () => resolve(q.result);
+    q.onerror = () => reject(q.error);
+  });
+}
+
+/** Packs installed the old way keep their files in Cache Storage. Unknown counts as "maybe", which is always safe. */
+let legacyPromise = null;
+const legacyPacks = () => (legacyPromise ??= dbGet("meta", "legacy").then((m) => !m || m.value !== false, () => true));
+
+async function fromPackFile(url) {
+  try {
+    const f = await dbGet("files", url);
+    if (f && f.data) {
+      return new Response(f.data, { headers: { "Content-Type": f.type || "application/octet-stream", "Content-Length": String(f.data.size) } });
+    }
+  } catch {
+    /* no database: fall through to the caches */
+  }
+  return undefined;
+}
+
+/** Never uses the global caches.match(): Cache Storage is slow to wake up on a phone with old-style packs. */
 async function lookup(req) {
   const url = req.url;
   if (!isMediaUrl(url)) return (await fromCache(SHELL, url)) || (await fromCache(MEDIA, url));
-  // Pictures and recordings: the small caches first, then the word packs.
-  return (await fromCache(MEDIA, url)) || (await fromCache(PACKS, url)) || (await fromCache(SHELL, url));
+  // Pictures and recordings: the database first (fast), then the small runtime cache, then old-style packs.
+  const file = await fromPackFile(url);
+  if (file) return file;
+  const small = (await fromCache(MEDIA, url)) || (await fromCache(SHELL, url));
+  if (small) return small;
+  if ((await legacyPacks()) && (await caches.has(PACKS))) return fromCache(PACKS, url);
+  return undefined;
 }
 
 // Start reading the packs cache index in the background as soon as the worker wakes up,
 // so by the time the first picture is wanted it is usually ready. Nothing waits for this
 // except the pictures and recordings themselves, and the saving of fresh copies below.
-const cacheReady = caches
-  .has(PACKS)
-  .then((has) => (has ? caches.open(PACKS).then((c) => c.match(new URL("./atlas/thumb/.warm", self.registration.scope).href)) : null))
+const cacheReady = legacyPacks()
+  .then((legacy) => (legacy ? caches.has(PACKS) : false))
+  .then((has) => (has ? caches.open(PACKS).then((c) => c.match(new URL("./atlas/thumb/.warm", self.registration.scope).href)) : caches.has(SHELL)))
   .then(() => undefined, () => undefined);
 
 /**

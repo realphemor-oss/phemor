@@ -16,6 +16,7 @@ import {
   downloadPack,
   fetchCatalog,
   installPack,
+  isLegacy,
   listInstalled,
   PACKS_CHANGED,
   removePack,
@@ -528,6 +529,7 @@ export function Packs({ route }: { route: Extract<Route, { page: "packs" }> }) {
                       v{p.manifest.version} · {mb(p.bytes)}
                       {p.rows.length ? ` · 新增/更新 ${p.rows.length} 词` : ""}
                     </small>
+                    {isLegacy(p) && <small className="warn-text">旧格式：打开 App 时图片要等十几秒。移除后重新添加一次即可变快（学习进度不受影响）。</small>}
                   </div>
                   <button
                     className="btn btn-ghost btn-danger"
