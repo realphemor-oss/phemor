@@ -1,6 +1,6 @@
 import type { Entry, IndexRow } from "../atlas/types";
 import { decryptBytes } from "./crypto";
-import { idbAll, idbDelete, idbPut } from "./idb";
+import { idbAll, idbDelete, idbGet, idbKeys, idbPut } from "./idb";
 import { keyForPack } from "./license";
 import { allowedFile, checkManifest, PACK_CACHE, PackError, sanitizeWords, type Extras, type PackManifest } from "./spec";
 import { crc32, readZipDirectory, readZipEntry, type ZipEntry } from "./zip";
@@ -47,6 +47,50 @@ export async function loadExtras(topics: number, levels: number): Promise<Extras
     /* a broken local database must never stop the app from starting */
   }
   return { rows, entries };
+}
+
+/** Pack ids that are free and need no activation; they are read before every other pack. */
+const FREE_PACK_IDS = ["list-junior"];
+
+const idle = () =>
+  new Promise<void>((resolve) =>
+    typeof requestIdleCallback === "function" ? requestIdleCallback(() => resolve(), { timeout: 1000 }) : setTimeout(resolve, 60),
+  );
+
+/**
+ * Start-up loader: reads the installed packs one at a time (the free pack first, then the others)
+ * and reports the words gathered so far after each one. The app is already on screen by then, so
+ * a phone with several large packs no longer makes you wait before anything shows.
+ */
+export async function loadExtrasStaged(
+  topics: number,
+  levels: number,
+  onStage: (extras: Extras) => void | Promise<void>,
+  cancelled: () => boolean = () => false,
+) {
+  let ids: string[] = [];
+  try {
+    ids = (await idbKeys()).map(String);
+  } catch {
+    return;
+  }
+  ids.sort((a, b) => Number(FREE_PACK_IDS.includes(b)) - Number(FREE_PACK_IDS.includes(a)));
+  const loaded: { seq: number; rows: IndexRow[]; entries: Entry[] }[] = [];
+  for (const id of ids) {
+    await idle();
+    if (cancelled()) return;
+    try {
+      const p = await idbGet<InstalledPack>(id);
+      if (!p) continue;
+      const clean = sanitizeWords({ rows: p.rows, entries: p.entries }, topics, levels);
+      loaded.push({ seq: p.seq, rows: clean.rows, entries: clean.entries });
+    } catch {
+      continue; // one unreadable pack must not stop the others
+    }
+    loaded.sort((a, b) => a.seq - b.seq);
+    if (cancelled()) return;
+    await onStage({ rows: loaded.flatMap((x) => x.rows), entries: loaded.flatMap((x) => x.entries) });
+  }
 }
 
 export async function requestPersist() {

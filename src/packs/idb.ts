@@ -32,6 +32,7 @@ async function run<T>(store: StoreName, mode: IDBTransactionMode, fn: (s: IDBObj
 }
 
 export const idbAll = <T>(store: StoreName = "packs") => run<T[]>(store, "readonly", (s) => s.getAll());
+export const idbKeys = (store: StoreName = "packs") => run<IDBValidKey[]>(store, "readonly", (s) => s.getAllKeys());
 export const idbGet = <T>(id: string, store: StoreName = "packs") => run<T | undefined>(store, "readonly", (s) => s.get(id));
 export const idbPut = (value: unknown, store: StoreName = "packs") => run(store, "readwrite", (s) => s.put(value));
 export const idbDelete = (id: string, store: StoreName = "packs") => run(store, "readwrite", (s) => s.delete(id));

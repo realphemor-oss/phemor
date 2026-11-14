@@ -1,5 +1,6 @@
 /* 非莫离线服务。
- * - 页面与词库目录：优先联网（3 秒没回应就用本机缓存），所以信号差也能秒开。
+ * - 页面：优先联网（1.5 秒没回应就用本机缓存），所以信号差也能快速打开。
+ * - 词库目录 index.json：先用本机缓存立刻显示，同时在后台更新，下次打开就是新的。
  * - 其余文件（插画、发音、词条、脚本）：本机有就直接用，没有再联网并记住。
  * - 单词包写入的 phemor-packs 缓存永远不会被这里清理，只能在 App 里移除。
  * - 支持 Range 请求：iPhone 播放音频必须靠它，否则离线时发音会失效。 */
@@ -7,7 +8,7 @@ const VERSION = "atlas-v2";
 const SHELL = `${VERSION}-shell`;
 const MEDIA = `${VERSION}-media`;
 const PACKS = "phemor-packs";
-const NETWORK_WAIT = 3000;
+const NETWORK_WAIT = 1500;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
@@ -102,6 +103,22 @@ async function networkFirst(req) {
   }
 }
 
+async function staleWhileRevalidate(event, req) {
+  const hit = await lookup(req);
+  const net = fetch(req).then((res) => {
+    if (res.ok) {
+      const copy = res.clone();
+      caches.open(SHELL).then((c) => c.put(req.url, copy));
+    }
+    return res;
+  });
+  if (hit) {
+    event.waitUntil(net.catch(() => null));
+    return hit;
+  }
+  return net;
+}
+
 async function cacheFirst(req) {
   const range = req.headers.get("range");
   const hit = await lookup(req);
@@ -128,6 +145,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== location.origin || !req.url.startsWith(self.registration.scope)) return;
-  const isShell = req.mode === "navigate" || url.pathname.endsWith("/atlas/index.json");
-  event.respondWith(isShell ? networkFirst(req) : cacheFirst(req));
+  const isPage = req.mode === "navigate";
+  const isIndex = url.pathname.endsWith("/atlas/index.json");
+  event.respondWith(isPage ? networkFirst(req) : isIndex ? staleWhileRevalidate(event, req) : cacheFirst(req));
 });

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { armCues } from "./lib/sound";
 import { AtlasContext, useAtlas, useEntry } from "./atlas/context";
 import { loadOpenAtlas, loadPrivateAtlas, warmEntries } from "./atlas/data";
-import { loadExtras, PACKS_CHANGED } from "./packs/install";
+import { loadExtras, loadExtrasStaged, PACKS_CHANGED } from "./packs/install";
 import type { Atlas } from "./atlas/types";
 import { REPO_URL } from "./config";
 import { closeWord, currentLocation, go, openWord, useLocation, type Route } from "./lib/router";
@@ -55,21 +55,45 @@ export default function App() {
   useEffect(() => {
     let live = true;
     let first = true;
-    const load = () =>
-      loadOpenAtlas(loadExtras).then(
-        (a) => {
-          if (!live) return;
-          setOpen(a);
-          if (first && import.meta.env.DEV) loadPrivateAtlas(a).then(setPriv, () => null);
-          first = false;
+    // Bumped whenever the packs change, so an unfinished start-up pass stops and the full reload wins.
+    let round = 0;
+    const apply = (a: Atlas) => {
+      if (!live) return;
+      setOpen(a);
+      if (first && import.meta.env.DEV) loadPrivateAtlas(a).then(setPriv, () => null);
+      first = false;
+    };
+    // A pack was added or removed (or any later reload): rebuild the word list with every pack at once.
+    const load = () => {
+      round++;
+      return loadOpenAtlas(loadExtras).then(apply, (e: Error) => live && first && setError(e.message));
+    };
+    // Start-up: show the app first with the built-in words, then add the free pack, then the others.
+    const start = async () => {
+      const mine = ++round;
+      let base: Atlas;
+      try {
+        base = await loadOpenAtlas();
+      } catch (e) {
+        if (live) setError((e as Error).message);
+        return;
+      }
+      if (!live || mine !== round) return;
+      apply(base);
+      await loadExtrasStaged(
+        base.topics.length,
+        base.cefr.length,
+        async (extras) => {
+          const a = await loadOpenAtlas(async () => extras);
+          if (live && mine === round) apply(a);
         },
-        (e: Error) => live && first && setError(e.message),
-      );
-    void load();
+        () => !live || mine !== round,
+      ).catch(() => null);
+    };
+    void start();
     // Once the app is up and the offline worker is in charge, quietly save all entry text.
     const flag = { cancelled: false };
     const warm = window.setTimeout(() => void warmEntries(flag).catch(() => null), 4000);
-    // A word pack was added or removed: rebuild the word list without a reload.
     const again = () => void load();
     window.addEventListener(PACKS_CHANGED, again);
     return () => {
@@ -83,7 +107,8 @@ export default function App() {
   useEffect(() => {
     const next = dataset === "private" && priv ? priv : open;
     if (next && next !== atlas) {
-      store.useDataset(next.id);
+      // Reload saved progress only when the dataset itself changes, not at each stage of loading packs.
+      if (!atlas || atlas.id !== next.id) store.useDataset(next.id);
       setAtlas(next);
     }
   }, [dataset, open, priv, atlas]);
