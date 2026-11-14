@@ -14,3 +14,8 @@ export const PACK_SHARE = {
 
 /** Where the list of downloadable word packs lives, relative to the site (override per deployment). */
 export const PACK_CATALOG = `${import.meta.env.BASE_URL}packs/packs.json`;
+
+/** 联系邮箱：显示在页脚和激活码面板，客户可复制或直接发邮件。 */
+export const CONTACT_EMAIL = "realphemor@gmail.com";
+/** 微信号：国内用户多半没有邮箱，点一下就复制。 */
+export const CONTACT_WECHAT = "LynxChiLL";

@@ -12,6 +12,7 @@ import {
 } from "../packs/license";
 import { PackError } from "../packs/spec";
 import { copyText } from "../packs/pwa";
+import { ContactMail } from "../ui/ContactMail";
 import { toast } from "../ui/Toast";
 
 const KNOWN: Record<string, string> = {
@@ -93,6 +94,7 @@ export function LicensePanel({
         >
           <Copy size={18} /> 复制设备码
         </button>
+        <ContactMail label="联系老师" subject="非莫激活码申请" body={device ? `我的设备码：${device.code}` : undefined} />
       </div>
       <div className="license-paste">
         <input

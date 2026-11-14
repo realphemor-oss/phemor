@@ -22,7 +22,7 @@ import { EntryView } from "./ui/EntryView";
 import { Logo } from "./ui/Logo";
 import { Palette } from "./ui/Palette";
 import { Sheet } from "./ui/Sheet";
-import { shouldShowSplash, Splash } from "./ui/Splash";
+import { ContactMail } from "./ui/ContactMail";
 import { Toasts } from "./ui/Toast";
 
 const NAV: { page: Route["page"]; label: string; icon: typeof Compass }[] = [
@@ -142,7 +142,6 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
   const onboarded = useStore((s) => s.settings.onboarded);
   const theme = useStore((s) => s.settings.theme);
   const [palette, setPalette] = useState(false);
-  const [splash, setSplash] = useState(shouldShowSplash);
   useEffect(() => armCues(), []);
   const focus = route.page === "learn";
 
@@ -214,6 +213,7 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
       {!focus && (
         <footer className="footer">
           <Logo compact />
+          <ContactMail label="联系我们" subject="非莫 phemor 咨询" />
           <p>
             一词一画，点亮雅思 · 免费开源 ·{" "}
             <a href={REPO_URL} target="_blank" rel="noreferrer">
@@ -237,8 +237,7 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
 
       <WordSheet id={word} />
       <Palette open={palette} onClose={() => setPalette(false)} />
-      {!onboarded && route.page !== "about" && !splash && <Onboarding />}
-      {splash && <Splash onDone={() => setSplash(false)} />}
+      {!onboarded && route.page !== "about" && <Onboarding />}
       <Toasts />
     </div>
   );

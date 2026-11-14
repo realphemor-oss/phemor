@@ -308,3 +308,16 @@
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+
+.contact-mail {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.contact-mail .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

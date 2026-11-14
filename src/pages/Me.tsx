@@ -163,7 +163,6 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
           </Field>
           <Toggle label="自动播放发音" on={settings.autoplay} set={(v) => set({ autoplay: v })} />
           <Toggle label="界面音效" on={settings.sfx} set={(v) => set({ sfx: v })} />
-          <Toggle label="开屏动画（每天一次）" on={settings.splash} set={(v) => set({ splash: v })} />
           <Toggle label="复习时加入拼写题" on={settings.spell} set={(v) => set({ spell: v })} />
           {privateAvailable && (
             <Field label="词库" hint="私人词库只在本机开发服务器中可用，不会被打包发布。">
