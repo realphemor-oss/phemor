@@ -85,6 +85,29 @@ npm run license -- batch customers.csv --out codes.csv
 - 一个客户可以有多个码（比如先买了高中包，后来加买大学包）；每个码独立。
 - 客户名默认不写进激活码。加 `--show-name` 后，名字会显示在客户的「授权」面板里——分享出去的人等于把自己的名字交了出去，这是一个威慑。批量签发时用 `npm run license -- batch customers.csv --show-name`。
 
+## 5.2 联网激活（序列号，每个最多 6 台设备）
+
+客户在「授权」页粘贴一个序列号（如 `K7M2-9QXR-4TNB-W3HC`），App 请求 `phemor.com/api/activate`，Cloudflare Worker 校验后现场签发一张**绑定这台设备**的激活码，客户不用再来找你要码。
+
+- 每个序列号最多 6 台不同设备；同一台设备重复激活不占名额；第 7 台会被拒绝（409）。
+- 数据库（Cloudflare D1）只存序列号的哈希，不存明文，也不存 IP 明文。
+- 连续输错会被限速（同一 IP 10 分钟内 15 次）。
+- 密钥：Worker 里放了 `MASTER_KEY` 和 `ISSUER_PRIVATE_JWK` 两个 secret，用来现场签发；Cloudflare 账号务必开两步验证/硬件钥匙。
+- 离线的 `PHEMOR1.…` 激活码仍然可用，作为兜底。
+- 重装 App、清除网站数据会换一个新设备密钥，占用一个新名额；名额用完可 `serial reset` 清零。
+
+命令（在 `phemor/` 目录）：
+
+```
+npm run license -- serial new --count 10000 --note 店铺A   # 批量生成（每次最多 2 万），得到 .txt（给店铺）和 .sql（导入数据库）
+npm run license -- serial status <序列号>                # 查已用几台
+npm run license -- serial reset  <序列号>                # 名额清零
+npm run license -- serial revoke <序列号>                # 停用（只阻止新的激活）
+```
+后三条只会打印一条 `wrangler d1 execute …` 命令，复制到终端运行即可。
+
+部署步骤见仓库外的《云端激活部署说明.txt》，或按 `worker/wrangler.toml` 顶部注释。测试：`npm run test:worker`。
+
 ## 6. 诚实的局限
 
 没有任何离线方案能做到绝对防拷贝：

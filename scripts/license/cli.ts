@@ -7,6 +7,11 @@
  *       客户名只记在你自己的 issued.csv 里；加 --show-name 才把名字写进激活码，客户手机上会显示出来（威慑用）
  *   npm run license -- batch customers.csv --out codes.csv
  *   npm run license -- show <激活码>
+ *
+ * 联网激活（每个序列号限 6 台设备，见 docs/license.md「联网激活」）：
+ *   npm run license -- serial new --count 200 [--packs all] [--max 6] [--note 店铺A] [--out DIR]
+ *       批量生成序列号：serials-*.txt 给店铺自动发货，serials-*.sql 导入云端数据库
+ *   npm run license -- serial status|reset|revoke <序列号>      打印对应的数据库命令（查看名额 / 清零名额 / 停用）
  *   npm run license -- encrypt a.phemor b.phemor --out DIR      （release 用的底层命令）
  */
 import crypto from "node:crypto";
@@ -14,6 +19,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatSerial, generateSerial, hashSerial, normalizeSerial } from "../../src/packs/serial.ts";
 import { CRYPT_ALG, derivePackKey, encryptBytes, aesKey, fingerprint, importSigningKey, issueLicense, parseDeviceCode, verifyLicense } from "../../src/packs/crypto.ts";
 import { checkManifest } from "../../src/packs/spec.ts";
 import { readZipDirectory, readZipEntry } from "../../src/packs/zip.ts";
@@ -247,6 +253,74 @@ async function batch(inFile: string | undefined, o: Record<string, string>) {
   console.log(`\n已生成 ${out.length - 1} 个激活码 → ${target}`);
 }
 
+/* ---------- serial（联网激活用的序列号） ---------- */
+const sqlq = (s: string) => `'${s.replace(/'/g, "''")}'`;
+const wranglerCmd = (sql: string, kind: "file" | "command") => `cd ${path.join(root, "worker")} && npx wrangler d1 execute phemor --remote --${kind} ${kind === "file" ? sql : JSON.stringify(sql)}`;
+
+async function serialCmd(pos: string[], o: Record<string, string>) {
+  const sub = pos[0];
+  if (sub === "new") {
+    const count = Number(o.count ?? "");
+    if (!Number.isInteger(count) || count < 1 || count > 20000) die("用法：npm run license -- serial new --count 200 [--packs all] [--max 6] [--note 店铺A] [--out DIR]\n（--count 是 1~20000 的整数）");
+    const max = o.max ? Number(o.max) : 6;
+    if (!Number.isInteger(max) || max < 1 || max > 100) die("--max 要是 1~100 的整数");
+    const packs = resolvePacks(o.packs || "all");
+    if (!packs.length) die("没有选中任何需要激活码的包。");
+    const note = o.note && o.note !== "true" ? o.note : "";
+    const out = o.out && o.out !== "true" ? path.resolve(o.out) : dir;
+    fs.mkdirSync(out, { recursive: true, mode: 0o700 });
+    const now = Math.floor(Date.now() / 1000);
+    const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+    const base = path.join(out, `serials-${stamp}-${count}`);
+    const seen = new Set<string>();
+    const serials: string[] = [];
+    while (serials.length < count) {
+      const sn = generateSerial();
+      if (!seen.has(sn)) {
+        seen.add(sn);
+        serials.push(sn);
+      }
+    }
+    const packJson = JSON.stringify(packs.map((p) => p.id));
+    const rows: string[] = [];
+    const log: string[] = [];
+    for (const sn of serials) {
+      const h = await hashSerial(normalizeSerial(sn)!);
+      rows.push(`(${sqlq(h)}, ${sqlq(packJson)}, ${max}, ${sqlq(note)}, 0, ${now})`);
+      log.push([new Date().toISOString(), sn, packs.map((p) => p.name).join("+"), max, note].map((x) => csvq(String(x))).join(","));
+    }
+    // 每条 INSERT 放 200 行：单条语句不超过 D1 的 100KB 上限，导入也比逐条快得多
+    const lines: string[] = [];
+    for (let i = 0; i < rows.length; i += 200) {
+      lines.push(`INSERT OR IGNORE INTO serials (hash, packs, max_devices, note, revoked, created) VALUES\n${rows.slice(i, i + 200).join(",\n")};`);
+    }
+    fs.writeFileSync(`${base}.txt`, serials.join("\n") + "\n", { mode: 0o600 });
+    fs.writeFileSync(`${base}.sql`, lines.join("\n") + "\n", { mode: 0o600 });
+    const logf = file("serials.csv");
+    if (!fs.existsSync(logf)) fs.writeFileSync(logf, "date,serial,packs,max_devices,note\n", { mode: 0o600 });
+    fs.appendFileSync(logf, log.join("\n") + "\n");
+    console.log(`已生成 ${count} 个序列号（${packs.map((p) => p.name).join("、")}，每个最多 ${max} 台设备）\n`);
+    console.log(`  序列号（给店铺/客户，要保密）：${base}.txt`);
+    console.log(`  导入云端数据库的 SQL（只含哈希）：${base}.sql\n`);
+    console.log(`下一步：先把 SQL 导入云端数据库，再上架序列号\n  ${wranglerCmd(`${base}.sql`, "file")}\n`);
+    return;
+  }
+  if (sub === "status" || sub === "reset" || sub === "revoke") {
+    const sn = pos[1] ? normalizeSerial(pos[1]) : null;
+    if (!sn) die(`用法：npm run license -- serial ${sub} K7M2-9QXR-4TNB-W3HC`);
+    const h = await hashSerial(sn!);
+    const sql =
+      sub === "status"
+        ? `SELECT (SELECT COUNT(*) FROM activations WHERE hash = ${sqlq(h)}) AS used, max_devices, revoked, note FROM serials WHERE hash = ${sqlq(h)}`
+        : sub === "reset"
+          ? `DELETE FROM activations WHERE hash = ${sqlq(h)}`
+          : `UPDATE serials SET revoked = 1 WHERE hash = ${sqlq(h)}`;
+    console.log(`序列号 ${formatSerial(sn!)}：请运行下面这条命令${sub === "reset" ? "（名额清零，客户可以重新在 6 台设备上激活，已激活的设备不受影响）" : sub === "revoke" ? "（停用后不能再激活新设备，已激活的设备不受影响）" : "（used 是已激活的设备数）"}\n\n  ${wranglerCmd(sql, "command")}\n`);
+    return;
+  }
+  die("用法：npm run license -- serial new|status|reset|revoke ...\n  serial new --count 200 [--packs all] [--max 6] [--note 店铺A] [--out DIR]\n  serial status|reset|revoke <序列号>");
+}
+
 /* ---------- show ---------- */
 async function show(code: string | undefined) {
   if (!code) die("用法：npm run license -- show <激活码>");
@@ -279,6 +353,9 @@ switch (cmd) {
     break;
   case "show":
     await show(pos[0]);
+    break;
+  case "serial":
+    await serialCmd(pos, o);
     break;
   default:
     console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0].replace(/^\/\* ?/, ""));

@@ -2,6 +2,7 @@ import { Copy, KeyRound, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   activate,
+  activateSerial,
   getDevice,
   LICENSES_CHANGED,
   licensingEnabled,
@@ -10,6 +11,7 @@ import {
   type Device,
   type StoredLicense,
 } from "../packs/license";
+import { looksLikeSerial } from "../packs/serial";
 import { PackError } from "../packs/spec";
 import { copyText } from "../packs/pwa";
 import { ContactMail } from "../ui/ContactMail";
@@ -54,9 +56,15 @@ export function LicensePanel({
     if (!code.trim() || busy) return;
     setBusy(true);
     try {
-      const rec = await activate(code);
-      setCode("");
-      toast(rec.cust ? `已激活：${rec.cust}` : "已激活", "ok");
+      if (looksLikeSerial(code)) {
+        const r = await activateSerial(code);
+        setCode("");
+        toast(`已激活（这个序列号已用 ${r.used}/${r.max} 台设备）`, "ok");
+      } else {
+        const rec = await activate(code);
+        setCode("");
+        toast(rec.cust ? `已激活：${rec.cust}` : "已激活", "ok");
+      }
     } catch (e) {
       toast(
         e instanceof PackError ? e.message : "激活失败，请检查激活码是否完整。",
@@ -69,13 +77,13 @@ export function LicensePanel({
 
   return (
     <section className="panel license-panel">
-      <h3 className="eyebrow">授权 · 高中包、大学包等需要激活码</h3>
+      <h3 className="eyebrow">授权 · 高中包、大学包等需要序列号</h3>
       <p className="muted packs-tip">
-        初中包免费使用。其他包需要老师发给你的激活码：先把下面的「设备码」发给老师，老师回复激活码后粘贴到这里。
+        初中包免费使用。其他包需要老师给你的<b>序列号</b>：粘贴到下面的框里，点「激活」。激活要联网，每个序列号最多可在 6 台设备（手机、iPad 都行）上激活，激活后离线也能用。请自己保存好序列号（比如收藏到微信），换手机或重装后再输入一次即可（重装也会占用一个名额，名额用完请联系老师）。
         iPhone 请在<b>主屏幕上的 App</b> 里操作，不要在 Safari 里。
       </p>
       <div className="license-device">
-        <span className="muted">本机设备码</span>
+        <span className="muted">本机设备码（离线激活用，一般不需要）</span>
         <code>{device ? device.fp : "…"}</code>
         <button
           className="btn btn-ghost"
@@ -100,8 +108,8 @@ export function LicensePanel({
         <input
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="粘贴激活码（PHEMOR1.…）"
-          aria-label="激活码"
+          placeholder="粘贴序列号（或 PHEMOR1.… 激活码）"
+          aria-label="序列号或激活码"
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
@@ -111,7 +119,7 @@ export function LicensePanel({
           disabled={busy || !code.trim()}
           onClick={() => void submit()}
         >
-          <KeyRound size={18} /> 激活
+          <KeyRound size={18} /> {busy ? "激活中…" : "激活"}
         </button>
       </div>
       {list.length > 0 && (
