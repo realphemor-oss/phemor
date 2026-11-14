@@ -24,6 +24,7 @@ import { Palette } from "./ui/Palette";
 import { Sheet } from "./ui/Sheet";
 import { ContactMail } from "./ui/ContactMail";
 import { Toasts } from "./ui/Toast";
+import { mark } from "./lib/diag";
 
 const NAV: { page: Route["page"]; label: string; icon: typeof Compass }[] = [
   { page: "today", label: "今日", icon: Compass },
@@ -70,6 +71,7 @@ export default function App() {
     };
     // Start-up: show the app first with the built-in words, then add the free pack, then the others.
     const start = async () => {
+      mark("App 开始读词库");
       const mine = ++round;
       let base: Atlas;
       try {
@@ -79,13 +81,17 @@ export default function App() {
         return;
       }
       if (!live || mine !== round) return;
+      mark("内置词库已读到，开始显示");
       apply(base);
       await loadExtrasStaged(
         base.topics.length,
         base.cefr.length,
         async (extras) => {
           const a = await loadOpenAtlas(async () => extras);
-          if (live && mine === round) apply(a);
+          if (live && mine === round) {
+            mark(`已加入单词包（累计 ${extras.rows.length} 个词）`);
+            apply(a);
+          }
         },
         () => !live || mine !== round,
       ).catch(() => null);

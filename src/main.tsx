@@ -7,10 +7,13 @@ import "./styles/app.css";
 import "./styles/packs.css";
 import { captureInstallPrompt } from "./packs/pwa";
 import { warmPackCache } from "./atlas/warm";
+import { mark } from "./lib/diag";
 
+mark("脚本开始运行");
 captureInstallPrompt();
 // Read the word-pack cache index in the background right away; the app never waits for it.
-void warmPackCache();
+mark("开始预热单词包缓存");
+void warmPackCache().then(() => mark("单词包缓存预热完成"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

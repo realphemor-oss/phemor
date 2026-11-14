@@ -1,9 +1,11 @@
 import { Download, RotateCcw, Upload } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAtlas } from "../atlas/context";
 import { isMastered } from "../store/srs";
 import { dayKey, exportBackup, importBackup, resetProgress, store, useStore, type Settings } from "../store/store";
 import { toast } from "../ui/Toast";
+import { probe, report } from "../lib/diag";
+import { copyText } from "../packs/pwa";
 import { streakOf } from "./Today";
 
 export function Me({ privateAvailable }: { privateAvailable: boolean }) {
@@ -216,8 +218,35 @@ export function Me({ privateAvailable }: { privateAvailable: boolean }) {
             </button>
           </div>
         </section>
+        <Diag />
       </div>
     </div>
+  );
+}
+
+function Diag() {
+  const [text, setText] = useState<string | null>(null);
+  const run = async () => {
+    setText("测量中…");
+    const lines = [...report(), "— 现场测一遍（越小越好）—", ...(await probe())];
+    setText(lines.join("\n"));
+  };
+  return (
+    <section className="panel">
+      <h3 className="eyebrow">启动速度诊断</h3>
+      <p className="muted">打开很慢时，点「测量」，再点「复制」发给老师，就能看出时间花在哪里。数据只在本机，不会上传。</p>
+      <div className="data-actions">
+        <button className="btn btn-ghost" onClick={() => void run()}>
+          测量
+        </button>
+        {text && text !== "测量中…" && (
+          <button className="btn btn-ghost" onClick={() => void copyText(text).then((ok) => toast(ok ? "已复制" : "复制失败，请长按文字手动复制", ok ? "ok" : "warn"))}>
+            复制
+          </button>
+        )}
+      </div>
+      {text && <pre className="diag-text">{text}</pre>}
+    </section>
   );
 }
 
