@@ -43,7 +43,7 @@ export async function shareGalaxy(source: HTMLCanvasElement, lit: number, total:
     g.fillText("非莫 · phemor", pad, H - 26);
     g.font = `400 24px ${SANS}`;
     g.fillStyle = "rgba(243,236,223,.55)";
-    const tag = "一词一画，点亮雅思";
+    const tag = "每天张口，不可替代";
     g.fillText(tag, W - pad - g.measureText(tag).width, H - 28);
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
     if (!blob) throw new Error("no blob");

@@ -222,7 +222,7 @@ function Shell({ privateAvailable }: { privateAvailable: boolean }) {
           <Logo compact />
           <ContactMail label="联系我们" subject="非莫 phemor 咨询" />
           <p>
-            一词一画，点亮雅思 · 免费开源 ·{" "}
+            每天张口，不可替代 · 免费开源 ·{" "}
             <a href={REPO_URL} target="_blank" rel="noreferrer">
               GitHub
             </a>{" "}

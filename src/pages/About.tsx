@@ -12,7 +12,7 @@ export function About() {
         <img src={`${BASE}brand/og.webp`} alt="" />
         <div>
           <p className="eyebrow">关于非莫</p>
-          <h1 className="display">一词一画，点亮雅思。</h1>
+          <h1 className="display">每天张口，不可替代。</h1>
           <p className="lede">
             非莫把雅思阅读 8000 词整理成 {atlas.count.toLocaleString()} 个词条。每个词一幅原创插画，一句日常例句，一句雅思例句，配英美发音、常用搭配和易混提示。学会一个，就在你的星图上点亮一颗星。
           </p>

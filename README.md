@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/banner.jpg" alt="词光 Word Atlas：一词一画，点亮雅思" width="100%">
+<img src="docs/assets/banner.jpg" alt="词光 Word Atlas：每天张口，不可替代" width="100%">
 
 # 词光 · Word Atlas
 
-**一词一画，点亮雅思。**
+**每天张口，不可替代。**
 
 7,298 个雅思核心词，每个词一幅原创插画、两条原创例句、英美发音和一套刚刚好的复习节奏。<br>
 免费，开源，无需注册，打开网页就能背。

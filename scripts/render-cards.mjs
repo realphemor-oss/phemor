@@ -81,19 +81,12 @@ const shot = async (html, w, h, out, type = "jpeg") => {
   console.log("wrote", path.relative(root, out));
 };
 
-const title = `一词一画，<br><em>点亮雅思</em>。`;
+const title = `每天张口，<br><em>不可替代</em>。`;
 const sub = `${fmt(index.count)} 个雅思词，每个都有一幅画<br>${fmt(index.examples)} 条原创例句 · 英美发音 · 免费开源`;
 await shot(card({ width: 1200, height: 630, cols: 6, rows: 7, tile: 150, title, sub, chips: ["无需注册", "手机可用", "CC BY 4.0 词库"] }), 1200, 630, path.join(root, "public/brand/og-card.jpg"));
 await shot(card({ width: 1600, height: 720, cols: 7, rows: 7, tile: 170, title, sub, chips: ["无需注册", "词汇星图", "JSON / CSV 下载"] }), 1600, 720, path.join(root, "docs/assets/banner.jpg"));
 
-// App icon (maskable: artwork kept inside the safe zone).
-await shot(
-  `<!doctype html><html><body style="margin:0;width:256px;height:256px;background:#1E2640;display:grid;place-items:center"><svg width="165" height="165" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="none" stroke="#F3ECDF" stroke-width="1.2"/><circle cx="16" cy="16" r="9.5" fill="none" stroke="#F3ECDF" stroke-width=".6" stroke-dasharray="1 1.8" opacity=".5"/><path d="M16 4 18.8 16 16 28 13.2 16Z" fill="#F3ECDF"/><path d="M16 4 18.8 16H13.2Z" fill="#E07A5A"/><path d="M4 16 16 13.6 28 16 16 18.4Z" fill="#F3ECDF" opacity=".35"/><circle cx="16" cy="16" r="1.4" fill="#1E2640"/></svg></body></html>`,
-  256,
-  256,
-  path.join(root, "public/icon-512.png"),
-  "png",
-);
+// App icons are generated from docs/assets/icon-source.png (see public/icon-*.png); not drawn here.
 
 // A dense wall of illustrations for README and launch posts.
 const wall = pick(12 * 6, 3);

@@ -109,7 +109,7 @@ export async function renderWordCard(atlas: Atlas, e: Entry) {
   ctx.fillText("非莫 · phemor", pad, H - 62);
   ctx.font = `400 26px ${SANS}`;
   ctx.fillStyle = "#7A7C88";
-  const tag = "一词一画，点亮雅思";
+  const tag = "每天张口，不可替代";
   ctx.fillText(tag, W - pad - ctx.measureText(tag).width, H - 64);
   return c;
 }
